@@ -25,7 +25,7 @@ public class TaskService {
 
     @Transactional
     public TaskResponse createTask(TaskRequest request) {
-        log.info("Creating new task: {}", request.getGoal());
+        log.info("Creating new-task: {}", request.getGoal());
 
         Task task = Task.builder()
                 .goal(request.getGoal())
