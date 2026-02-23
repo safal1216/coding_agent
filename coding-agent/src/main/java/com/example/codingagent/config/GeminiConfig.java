@@ -31,6 +31,7 @@ public class GeminiConfig {
         return WebClient.builder()
                 .baseUrl(baseUrl)
                 .defaultHeader("Content-Type", "application/json")
+                .defaultHeader("x-goog-api-key", apiKey)
                 .build();
     }
 
