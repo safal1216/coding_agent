@@ -11,10 +11,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -22,11 +22,16 @@ import java.util.stream.Collectors;
 public class TaskService {
 
     private final TaskRepository taskRepository;
+    private final AsyncTaskProcessor asyncTaskProcessor;
 
+    /**
+     * Create a new task and trigger async processing.
+     */
     @Transactional
     public TaskResponse createTask(TaskRequest request) {
-        log.info("Creating new-task: {}", request.getGoal());
+        log.info("Creating new task: {}", request.getGoal());
 
+        // Create task entity
         Task task = Task.builder()
                 .goal(request.getGoal())
                 .description(request.getDescription())
@@ -36,21 +41,39 @@ public class TaskService {
                 .maxIterations(10)
                 .build();
 
+        // Save to database
         Task saved = taskRepository.save(task);
-
         log.info("Created task with ID: {}", saved.getId());
+
+        // Trigger async processing AFTER transaction commits
+        // This prevents "Task not found" errors
+        UUID taskId = saved.getId();
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        log.info("Transaction committed, triggering async processing for task: {}", taskId);
+                        asyncTaskProcessor.processTaskAsync(taskId);
+                    }
+                }
+        );
 
         return toResponse(saved);
     }
 
+    /**
+     * Get a task by ID.
+     */
     @Transactional(readOnly = true)
     public TaskResponse getTask(UUID taskId) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new TaskNotFoundException(taskId));
-
         return toResponse(task);
     }
 
+    /**
+     * List tasks with optional filtering.
+     */
     @Transactional(readOnly = true)
     public List<TaskResponse> listTasks(String statusFilter, int page, int size) {
         if (statusFilter != null && !statusFilter.isEmpty()) {
@@ -65,6 +88,9 @@ public class TaskService {
                 .getContent();
     }
 
+    /**
+     * Cancel a running task.
+     */
     @Transactional
     public void cancelTask(UUID taskId) {
         Task task = taskRepository.findById(taskId)
@@ -78,6 +104,9 @@ public class TaskService {
         }
     }
 
+    /**
+     * Convert entity to response DTO.
+     */
     private TaskResponse toResponse(Task task) {
         return TaskResponse.builder()
                 .taskId(task.getId())

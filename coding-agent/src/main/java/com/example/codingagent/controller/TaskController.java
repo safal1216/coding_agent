@@ -2,6 +2,7 @@ package com.example.codingagent.controller;
 
 import com.example.codingagent.dto.TaskRequest;
 import com.example.codingagent.dto.TaskResponse;
+import com.example.codingagent.service.AsyncTaskProcessor;
 import com.example.codingagent.service.TaskService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
